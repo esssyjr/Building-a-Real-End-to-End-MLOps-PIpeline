@@ -1,0 +1,83 @@
+version: "3.9"
+
+services:
+
+  # =============================
+  # AIRFLOW SERVICE
+  # =============================
+  airflow:
+    build:
+      context: ./airflow_service
+    container_name: airflow_service
+    volumes:
+      - ./dags:/opt/airflow/dags          # DAG files
+      - "./NAIRA DATASET:/opt/airflow/data"
+      - ./airflow_service:/app            # Original code
+    environment:
+      - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - MLFLOW_TRACKING_URI=http://mlflow_service:5000
+      - MLFLOW_TRACKING_INSECURE_TLS=true
+      - AIRFLOW__CORE__ENABLE_XCOM_PICKLING=True
+      - AIRFLOW__API__AUTH_BACKENDS=airflow.api.auth.backend.basic_auth
+    command: airflow standalone
+    ports: 
+      - "8080:8080"
+    depends_on:
+      - mlflow
+    restart: unless-stopped
+
+  # =============================
+  # MLFLOW SERVICE
+  # =============================
+  mlflow:
+    build:
+      context: ./mlflow_service
+    container_name: mlflow_service
+    volumes:
+       - ./mlruns:/mlflow_data
+    ports:
+       - "5000:5000"
+    environment:
+       - MLFLOW_TRACKING_URI=http://0.0.0.0:5000
+       - MLFLOW_DISABLE_HOST_CHECK=true
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri sqlite:///mlflow.db
+      --default-artifact-root mlflow-artifacts:/
+      --serve-artifacts
+      --allowed-hosts mlflow_service,mlflow_service:5000,localhost,127.0.0.1,0.0.0.0,mlflow_service:5000,localhost,localhost:5000,127.0.0.1,127.0.0.1:5000,0.0.0.0
+
+  # =============================
+  # FASTAPI SERVICE
+  # =============================
+  fastapi:
+    build:
+      context: ./fastapi_service
+    container_name: fastapi_service
+    volumes:
+      - ./fastapi_service:/app
+    ports:
+      - "8020:8020"
+    depends_on:
+      - airflow
+    environment:
+      - AIRFLOW_API_BASE=http://airflow:8080
+    restart: unless-stopped
+
+  # =============================
+  # STREAMLIT SERVICE
+  # =============================
+  streamlit:
+    build:
+      context: ./streamlit_service
+    container_name: streamlit_service
+    volumes:
+      - ./streamlit_service:/app
+    ports:
+      - "8501:8501"
+    depends_on:
+      - fastapi
+    restart: unless-stopped
+
