@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+python-multipart
+Pillow
+
+mlflow==2.17.2
+tensorflow==2.12.0
+keras==2.12.0
+numpy==1.23.5
+
